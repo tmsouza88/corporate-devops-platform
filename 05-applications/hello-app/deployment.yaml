@@ -17,6 +17,6 @@ spec:
       - name: hello-app
         image: hashicorp/http-echo:0.2.3
         args:
-          - "-text=Hello from FluxCD!"
+          - "-text=Hello from Canary Version V2!"
         ports:
         - containerPort: 5678
