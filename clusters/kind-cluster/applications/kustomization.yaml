@@ -5,3 +5,4 @@ resources:
   - ../../../05-applications/hello-app/service.yaml
   - ../../../05-applications/hello-app/ingress.yaml
   - ../../../05-applications/hello-app/canary.yaml
+  - ../../../cluster/kind-cluster/infrastructure.yaml
