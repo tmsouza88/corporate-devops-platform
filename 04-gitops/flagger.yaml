@@ -1,13 +1,13 @@
-apiVersion: source.toolkit.fluxcd.io/v1
+apiVersion: source.toolkit.fluxcd.io/v1beta1
 kind: HelmRepository
 metadata:
   name: flagger
   namespace: flux-system
 spec:
   interval: 1h
-  url: https://flagger.app
+  url: https://flagger.github.io/flagger
 ---
-apiVersion: helm.toolkit.fluxcd.io/v2
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
 kind: HelmRelease
 metadata:
   name: flagger
@@ -17,6 +17,7 @@ spec:
   chart:
     spec:
       chart: flagger
+      version: 1.15.0 # ou a última versão estável
       sourceRef:
         kind: HelmRepository
         name: flagger
@@ -24,4 +25,4 @@ spec:
   values:
     prometheus:
       url: http://kube-stack-prometheus-kube-p-prometheus.monitoring:9090
-    meshProvider: nginx # Como estamos usando NGINX Ingress
+    meshProvider: nginx
