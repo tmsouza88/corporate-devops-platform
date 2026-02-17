@@ -1,8 +1,8 @@
-💼 Corporate DevOps Platform
+# 💼 Corporate DevOps Platform
 
 Plataforma completa de DevOps corporativo para aprendizado prático de Infraestrutura como Código (IaC), Configuração Automatizada, GitOps e CI/CD moderno, utilizando ferramentas open source e práticas recomendadas de SRE.
 
-📂 Estrutura do Projeto
+# 📂 Estrutura do Projeto
 
 corporate-devops-platform/
 
@@ -18,7 +18,8 @@ corporate-devops-platform/
 ├── docs/               # Documentação complementar
 └── scripts/            # Scripts auxiliares para deploy e validação
 
-🧰 Tecnologias e Ferramentas Utilizadas
+# 🧰 Tecnologias e Ferramentas Utilizadas:
+
 🧱 Terraform: Provisionamento do cluster Kubernetes local (Kind)
 🤖 Ansible: Configuração automatizada do cluster e componentes essenciais
 🔁 FluxCD: GitOps para sincronização contínua do estado do cluster com o repositório Git
@@ -29,11 +30,15 @@ corporate-devops-platform/
 🌐 Ingress NGINX & Cert-Manager: Gerenciamento de tráfego e certificados TLS
 🔄 Fluxo de Trabalho
 🏗 Provisionamento: Terraform cria o cluster Kind local.
-🔧 Configuração: Ansible instala e configura ingress, monitoramento e outros componentes.
-🚦 GitOps: FluxCD monitora o repositório Git e aplica automaticamente as configurações e aplicações no cluster.
-🚀 CI/CD: GitHub Actions builda a imagem Docker do app, faz push para o Docker Hub e atualiza o manifesto Kubernetes no Git, disparando o FluxCD para atualizar o cluster.
 
-🚀 Como Usar:
+# 🔧 Configuração: Ansible instala e configura ingress, monitoramento e outros componentes.
+
+# 🚦 GitOps: FluxCD monitora o repositório Git e aplica automaticamente as configurações e aplicações no cluster.
+
+# 🚀 CI/CD: GitHub Actions builda a imagem Docker do app, faz push para o Docker Hub e atualiza o manifesto Kubernetes no Git, disparando o FluxCD para atualizar o cluster.
+
+# 🚀 Como Usar:
+
 ✅ Pré-requisitos
 🐳 Docker instalado e rodando
 🪟 WSL2 (para ambiente Linux no Windows)
@@ -44,6 +49,7 @@ corporate-devops-platform/
 
 # Clone o repositório
 git clone https://github.com/seu-usuario/corporate-devops-platform.git
+
 cd corporate-devops-platform
 
 # Execute os scripts de setup para instalar ferramentas
@@ -65,12 +71,12 @@ flux get all -n flux-system
 # Deploy da aplicação via GitHub Actions
 # (pipeline automático ao dar push nas pastas 05-applications)
 
-📈 Próximos Passos
+# 📈 Próximos Passos
 📌 Módulo 8: Estratégias avançadas de deployment (Canary, Blue-Green) com Flagger
 🛡 Módulo 9: Segurança e políticas com Kyverno/OPA
 ♻️ Módulo 10: Disaster Recovery e resiliência via GitOps
 
-📬 Contato:
+# 📬 Contato:
 💡 Para dúvidas, sugestões ou contribuições:
 Abra uma issue
 Envie um pull request

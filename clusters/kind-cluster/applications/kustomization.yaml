@@ -4,3 +4,4 @@ resources:
   - ../../../05-applications/hello-app/deployment.yaml
   - ../../../05-applications/hello-app/service.yaml
   - ../../../05-applications/hello-app/ingress.yaml
+  - ../../../05-applications/hello-app/canary.yaml

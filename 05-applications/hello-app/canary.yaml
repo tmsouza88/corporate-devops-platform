@@ -1,0 +1,31 @@
+apiVersion: flagger.app/v1beta1
+kind: Canary
+metadata:
+  name: hello-app
+  namespace: default
+spec:
+  # Referência ao Deployment que criamos no Módulo 6
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: hello-app
+  # Configuração do Service Mesh / Ingress
+  ingressRef:
+    apiVersion: networking.k8s.io/v1
+    kind: Ingress
+    name: hello-ingress
+  # Intervalo de análise
+  analysis:
+    interval: 1m
+    threshold: 5
+    maxWeight: 50
+    stepWeight: 10
+    metrics:
+      - name: request-success-rate
+        thresholdRange:
+          min: 99
+        interval: 1m
+      - name: request-duration
+        thresholdRange:
+          max: 500
+        interval: 1m
