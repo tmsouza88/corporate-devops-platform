@@ -1,9 +1,11 @@
 💼 Corporate DevOps Platform
+
 Plataforma completa de DevOps corporativo para aprendizado prático de Infraestrutura como Código (IaC), Configuração Automatizada, GitOps e CI/CD moderno, utilizando ferramentas open source e práticas recomendadas de SRE.
 
 📂 Estrutura do Projeto
 
 corporate-devops-platform/
+
 ├── 00-setup/           # Scripts para instalação e verificação de ferramentas
 ├── 01-infrastructure/  # Código Terraform para provisionamento do cluster Kind
 ├── 02-configuration/   # Playbooks Ansible para configuração do cluster (Ingress, Cert-Manager, Monitoramento)
