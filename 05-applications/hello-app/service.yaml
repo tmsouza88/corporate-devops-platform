@@ -1,13 +1,13 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: hello-service
+  name: hello-app # MUDANÇA AQUI: de hello-service para hello-app
   namespace: default
 spec:
   selector:
     app: hello-app
   ports:
     - protocol: TCP
-      port: 80            # Porta do serviço
-      targetPort: 5678    # Porta do container
+      port: 80
+      targetPort: 5678
   type: ClusterIP
