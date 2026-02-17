@@ -1,0 +1,57 @@
+---
+- name: Instalar ingress-nginx no Kubernetes com hostPort e NodePort
+  hosts: localhost
+  gather_facts: no
+  vars:
+    ingress_namespace: ingress-nginx
+    helm_release_name: ingress-nginx
+    helm_chart_name: ingress-nginx/ingress-nginx
+    helm_chart_version: "4.11.0"
+
+  tasks:
+    - name: Adicionar repositório Helm ingress-nginx
+      kubernetes.core.helm_repository:
+        name: ingress-nginx
+        repo_url: https://kubernetes.github.io/ingress-nginx
+
+    - name: Atualizar repositórios Helm
+      command: helm repo update
+      changed_when: false
+
+    - name: Criar namespace ingress-nginx
+      kubernetes.core.k8s:
+        api_version: v1
+        kind: Namespace
+        name: "{{ ingress_namespace }}"
+        state: present
+
+    - name: Instalar ingress-nginx via helm com hostPort e NodePort
+      kubernetes.core.helm:
+        name: "{{ helm_release_name }}"
+        chart_ref: "{{ helm_chart_name }}"
+        chart_version: "{{ helm_chart_version }}"
+        release_namespace: "{{ ingress_namespace }}"
+        create_namespace: false
+        values:
+          controller:
+            hostPort:
+              enabled: true
+              ports:
+                http: 80
+                https: 443
+            service:
+              type: NodePort
+            # Removido o nodeSelector antigo que apontava para um nó inexistente
+            # Se quiser explicitar que pode rodar em qualquer nó Linux:
+            nodeSelector:
+              kubernetes.io/os: linux
+            watchIngressWithoutClass: true
+        state: present
+
+    - name: Aguardar pods ingress-nginx prontos
+      command: >
+        kubectl wait --namespace {{ ingress_namespace }} --for=condition=ready pod
+        --selector=app.kubernetes.io/component=controller --timeout=180s
+      register: wait_ingress
+      failed_when: wait_ingress.rc != 0 and wait_ingress.rc != 124
+      changed_when: false

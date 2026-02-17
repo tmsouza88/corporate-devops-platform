@@ -1,0 +1,30 @@
+---
+- name: Configurar ClusterIssuer na Plataforma
+  hosts: localhost
+  gather_facts: no
+  collections:
+    - kubernetes.core
+
+  tasks:
+    - name: Criar ClusterIssuer Self-Signed
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: cert-manager.io/v1
+          kind: ClusterIssuer
+          metadata:
+            name: selfsigned-issuer
+          spec:
+            selfSigned: {}
+
+    - name: Criar ClusterIssuer CA (Para simular uma CA Corporativa)
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: cert-manager.io/v1
+          kind: ClusterIssuer
+          metadata:
+            name: corporate-ca-issuer
+          spec:
+            ca:
+              secretName: root-ca-secret # Este secret será gerado pelo cert-manager

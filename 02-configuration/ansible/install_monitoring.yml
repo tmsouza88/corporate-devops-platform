@@ -1,0 +1,39 @@
+---
+- name: Instalar Stack de Monitoramento (Prometheus & Grafana)
+  hosts: localhost
+  gather_facts: no
+  vars:
+    monitor_namespace: monitoring
+    grafana_host: grafana.corporate.local
+
+  tasks:
+    - name: Instalar kube-prometheus-stack via Helm
+      kubernetes.core.helm:
+        name: kube-stack
+        chart_ref: prometheus-community/kube-prometheus-stack
+        release_namespace: "{{ monitor_namespace }}"
+        create_namespace: no
+        values:
+          grafana:
+            ingress:
+              enabled: true
+              ingressClassName: nginx
+              annotations:
+                cert-manager.io/cluster-issuer: "corporate-issuer"
+              hosts:
+                - "{{ grafana_host }}"
+              path: /
+              tls:
+                - secretName: grafana-tls
+                  hosts:
+                    - "{{ grafana_host }}"
+            adminPassword: "admin" # Senha padrão para o Lab
+          prometheus:
+            prometheusSpec:
+              retention: 1d # Economiza espaço no seu Lab
+        state: present
+
+    - name: Aguardar pods do monitoramento
+      command: >
+        kubectl wait --namespace {{ monitor_namespace }} --for=condition=ready pod
+        --selector=app.kubernetes.io/name=grafana --timeout=300s

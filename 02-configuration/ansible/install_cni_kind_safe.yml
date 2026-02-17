@@ -1,0 +1,193 @@
+---
+- name: "Ajuste CNI e estabiliza cert-manager (Kind-safe)"
+  hosts: localhost
+  gather_facts: no
+  vars:
+    # CNI manifests (usado somente se não for Kind)
+    cni_choice: "flannel"   # flannel | calico | cilium (não será aplicado se detectado Kind)
+    cni_manifests:
+      flannel: "https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml"
+      calico: "https://raw.githubusercontent.com/projectcalico/calico/v3.25.0/manifests/calico.yaml"
+      cilium: "https://raw.githubusercontent.com/cilium/cilium/1.14/install/kubernetes/quick-install.yaml"
+    kube_wait_timeout: 300
+    certmgr_namespace: cert-manager
+
+  tasks:
+    - name: "Mostrar pods kube-system (inicial)"
+      command: kubectl get pods -n kube-system -o wide
+      register: pods_kube_system_before
+      changed_when: false
+
+    - name: "Detectar se cluster é Kind (procura daemonset kindnet)"
+      command: kubectl get daemonset kindnet -n kube-system
+      register: kindnet_check
+      failed_when: false
+      changed_when: false
+
+    - name: "Set fact is_kind"
+      set_fact:
+        is_kind: "{{ kindnet_check.rc == 0 }}"
+
+    - name: "Listar daemonsets no namespace kube-system (para detectar flannel)"
+      command: kubectl get daemonset -n kube-system -o name
+      register: ds_list
+      changed_when: false
+      failed_when: false
+
+    - name: "Set fact flannel_present (true se 'flannel' aparecer nos nomes de daemonset)"
+      set_fact:
+        flannel_present: "{{ 'flannel' in (ds_list.stdout | default('')) }}"
+
+    - name: "Debug - tipo de cluster e presença de flannel"
+      debug:
+        msg:
+          - "is_kind={{ is_kind }}"
+          - "flannel_present={{ flannel_present }}"
+
+    - name: "Remover Flannel (apenas quando for Kind e Flannel detectado) - ação segura"
+      when: is_kind and flannel_present
+      block:
+        - name: "Deletar manifest Flannel"
+          command: kubectl delete -f "{{ cni_manifests.flannel }}"
+          register: delete_flannel
+          failed_when: false
+          changed_when: delete_flannel.rc == 0
+
+        - name: "Aguardar pods flannel sumirem (se existirem)"
+          shell: |
+            for i in $(seq 1 20); do
+              if kubectl get pods -n kube-system | grep -i flannel >/dev/null 2>&1; then
+                echo "flannel still present, waiting..."
+                sleep 3
+              else
+                echo "flannel removed"
+                exit 0
+              fi
+            done
+            exit 1
+          args:
+            executable: /bin/bash
+          register: wait_flannel_removed
+          failed_when: false
+          changed_when: false
+
+        - name: "Mostrar resultado remoção flannel"
+          debug:
+            var: wait_flannel_removed.stdout_lines
+
+    - name: "Aplicar CNI escolhido (somente se NÃO for Kind e se não houver CNI detectado previamente)"
+      when: not is_kind and not flannel_present
+      block:
+        - name: "Aplicar manifest do CNI"
+          command: kubectl apply -f "{{ cni_manifests[cni_choice] }}"
+          register: apply_cni
+          failed_when: apply_cni.rc != 0
+        - name: "Mostrar saída da aplicação do CNI"
+          debug:
+            var: apply_cni.stdout_lines
+
+    - name: "Aguardar pods do kube-system ficarem prontos (não falha - registra resultado)"
+      command: kubectl wait --for=condition=Ready pod --all -n kube-system --timeout={{ kube_wait_timeout }}s
+      register: wait_kube_system
+      ignore_errors: yes
+
+    - name: "Se wait falhar, coletar diagnóstico e tentar remediação"
+      when: wait_kube_system.rc != 0
+      block:
+        - name: "Listar pods kube-system (após wait)"
+          command: kubectl get pods -n kube-system -o wide
+          register: pods_kube_system_after
+          changed_when: false
+
+        - name: "Listar daemonsets kube-system"
+          command: kubectl get daemonset -n kube-system -o wide
+          register: ds_kube_system
+          changed_when: false
+
+        - name: "Coletar describe e logs de kube-proxy / kube-scheduler / flannel (se existir)"
+          shell: |
+            set -o pipefail
+            echo "=== PODS NOT READY ==="
+            kubectl get pods -n kube-system -o custom-columns=NAME:.metadata.name,READY:.status.containerStatuses[*].ready --no-headers | awk '$2 !~ /true/ {print $1}' || true
+            echo
+            echo "=== DESCRIBES & LOGS (kube-proxy | kube-scheduler | flannel) ==="
+            for p in $(kubectl get pods -n kube-system -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | egrep 'kube-proxy|kube-scheduler|flannel' || true); do
+              echo; echo ">>> DESCRIBE $p <<<"; kubectl describe pod -n kube-system $p || true
+              echo; echo ">>> LOGS $p <<<"; kubectl logs -n kube-system $p --tail=200 || true
+            done
+          args:
+            executable: /bin/bash
+          register: diag_output
+          changed_when: false
+          failed_when: false
+
+        - name: "Mostrar diagnóstico coletado (resumo)"
+          debug:
+            var: diag_output.stdout_lines
+
+        - name: "Rollout restart daemonset kube-proxy (tenta remediar)"
+          command: kubectl rollout restart daemonset kube-proxy -n kube-system
+          register: restart_kube_proxy
+          failed_when: restart_kube_proxy.rc not in [0,1]
+          changed_when: true
+
+        - name: "Aguardar 8s após restart"
+          pause:
+            seconds: 8
+
+        - name: "Deletar pods kube-proxy não prontos (forçar recreate)"
+          shell: |
+            for p in $(kubectl get pods -n kube-system -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.containerStatuses[*].ready}{"\n"}{end}' | awk '$2 !~ /true/ {print $1}' | egrep 'kube-proxy' || true); do
+              echo "Deleting pod $p"
+              kubectl delete pod -n kube-system $p --grace-period=0 --force || true
+            done
+          args:
+            executable: /bin/bash
+          register: delete_unready
+          changed_when: "'Deleting pod' in delete_unready.stdout"
+          failed_when: false
+
+        - name: "Aguardar 60s para pods recriarem"
+          pause:
+            seconds: 60
+
+        - name: "Re-tentar wait curto para kube-system pods"
+          command: kubectl wait --for=condition=Ready pod --all -n kube-system --timeout=90s
+          register: wait_kube_system_retry
+          ignore_errors: yes
+
+        - name: "Mostrar resultado do retry"
+          debug:
+            var: wait_kube_system_retry
+
+    - name: "Resultado final: listar pods kube-system"
+      command: kubectl get pods -n kube-system -o wide
+      register: final_kube_system
+      changed_when: false
+
+    - name: "Mostrar pods finais"
+      debug:
+        var: final_kube_system.stdout_lines
+
+    - name: "Recriar pods do cert-manager de forma segura"
+      block:
+        - name: "Deletar pods do cert-manager para forçar recreate (se existir namespace)"
+          command: kubectl delete pod -n {{ certmgr_namespace }} --all
+          register: delete_cert_pods
+          failed_when: delete_cert_pods.rc not in [0,1]
+          changed_when: true
+          ignore_errors: yes
+
+        - name: "Aguardar cert-manager ficar pronto (timeout curto)"
+          command: kubectl wait --for=condition=Ready pod --all -n {{ certmgr_namespace }} --timeout=180s
+          register: wait_certmgr
+          ignore_errors: yes
+
+        - name: "Mostrar pods do cert-manager"
+          command: kubectl get pods -n {{ certmgr_namespace }} -o wide
+          register: certmgr_pods
+          changed_when: false
+
+        - name: "Mostrar status cert-manager (resumo)"
+          debug:
+            var: certmgr_pods.stdout_lines

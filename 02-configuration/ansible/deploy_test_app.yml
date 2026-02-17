@@ -1,0 +1,88 @@
+---
+- name: Deploy de App de Teste com HTTPS Automático
+  hosts: localhost
+  gather_facts: no
+  collections:
+    - kubernetes.core
+
+  vars:
+    app_name: devops-lab-app
+    domain: lab.local
+
+  tasks:
+    - name: Criar Namespace de Teste
+      kubernetes.core.k8s:
+        name: lab-test
+        kind: Namespace
+        state: present
+
+    - name: Deploy Nginx de Teste
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: "{{ app_name }}"
+            namespace: lab-test
+          spec:
+            replicas: 1
+            selector:
+              matchLabels:
+                app: "{{ app_name }}"
+            template:
+              metadata:
+                labels:
+                  app: "{{ app_name }}"
+              spec:
+                containers:
+                - name: nginx
+                  image: nginx:alpine
+                  ports:
+                  - containerPort: 80
+
+    - name: Criar Service para o App
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: "{{ app_name }}-svc"
+            namespace: lab-test
+          spec:
+            selector:
+              app: "{{ app_name }}"
+            ports:
+            - protocol: TCP
+              port: 80
+              targetPort: 80
+
+    - name: Criar Ingress com TLS Automático (Mágica acontece aqui)
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: networking.k8s.io/v1
+          kind: Ingress
+          metadata:
+            name: "{{ app_name }}-ingress"
+            namespace: lab-test
+            annotations:
+              cert-manager.io/cluster-issuer: "selfsigned-issuer" # Chama o cert-manager
+              kubernetes.io/ingress.class: "nginx"
+          spec:
+            tls:
+            - hosts:
+              - "{{ domain }}"
+              secretName: "{{ app_name }}-tls-secret" # O cert-manager vai criar este secret
+            rules:
+            - host: "{{ domain }}"
+              http:
+                paths:
+                - path: /
+                  pathType: Prefix
+                  backend:
+                    service:
+                      name: "{{ app_name }}-svc"
+                      port:
+                        number: 80

@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: {{ item.name }}-quota
+  namespace: {{ item.name }}
+spec:
+  hard:
+    requests.cpu: "{{ item.cpu_req }}"
+    requests.memory: "{{ item.mem_req }}"
+    limits.cpu: "{{ item.cpu_lim }}"
+    limits.memory: "{{ item.mem_lim }}"
+    pods: "{{ item.pods }}"

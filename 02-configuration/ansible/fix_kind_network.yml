@@ -1,0 +1,48 @@
+---
+- name: "Limpeza Profunda de Rede no Kind"
+  hosts: localhost
+  gather_facts: no
+  tasks:
+    - name: "Listar containers dos nodes do Kind"
+      shell: docker ps --filter "label=io.x-k8s.kind.cluster" --format "{% raw %}{{.Names}}{% endraw %}"
+      register: kind_nodes
+      changed_when: false
+
+    - name: "Limpar resíduos do Flannel e CNI nos nodes"
+      shell: |
+        docker exec {{ item }} bash -c "rm -rf /etc/cni/net.d/*flannel* /run/flannel/ /opt/cni/bin/flannel"
+        docker exec {{ item }} bash -c "ip link delete flannel.1 || true"
+        docker exec {{ item }} bash -c "ip link delete cni0 || true"
+      loop: "{{ kind_nodes.stdout_lines }}"
+      ignore_errors: yes
+
+    - name: "Garantir que o diretório CNI bin tem os plugins básicos"
+      shell: |
+        docker exec {{ item }} bash -c "ls /opt/cni/bin/bridge || (curl -L https://github.com/containernetworking/plugins/releases/download/v1.1.1/cni-plugins-linux-amd64-v1.1.1.tgz | tar -xz -C /opt/cni/bin)"
+      loop: "{{ kind_nodes.stdout_lines }}"
+      ignore_errors: yes
+
+    - name: "Resetar ConfigMap do kube-proxy (forçar padrão)"
+      shell: |
+        kubectl get configmap -n kube-system kube-proxy -o yaml > kube-proxy-cm.bak
+        # Aqui garantimos que o modo é iptables (padrão do Kind)
+        sed -i 's/mode: ".*"/mode: "iptables"/' kube-proxy-cm.bak
+        kubectl apply -f kube-proxy-cm.bak
+      ignore_errors: yes
+
+    - name: "Forçar restart do kube-proxy e kindnet"
+      shell: |
+        kubectl rollout restart daemonset kube-proxy -n kube-system
+        kubectl rollout restart daemonset kindnet -n kube-system
+      
+    - name: "Aguardar estabilização"
+      pause:
+        seconds: 30
+
+    - name: "Verificar status final do kube-proxy"
+      command: kubectl get pods -n kube-system -l k8s-app=kube-proxy
+      register: proxy_status
+
+    - name: "Mostrar status"
+      debug:
+        var: proxy_status.stdout_lines

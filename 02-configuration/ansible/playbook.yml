@@ -1,0 +1,5 @@
+---
+- name: Configure K8s Governance
+  hosts: local
+  roles:
+    - k8s-governance

@@ -1,0 +1,46 @@
+---
+- name: Instalar ingress-nginx no Kubernetes
+  hosts: localhost
+  gather_facts: no
+  vars:
+    ingress_namespace: ingress-nginx
+    helm_release_name: ingress-nginx
+    helm_chart_name: ingress-nginx/ingress-nginx
+    helm_chart_version: "4.11.0"
+
+  tasks:
+    - name: Adicionar repositório Helm ingress-nginx
+      kubernetes.core.helm_repository:
+        name: ingress-nginx
+        repo_url: https://kubernetes.github.io/ingress-nginx
+
+    - name: Atualizar repositórios Helm
+      command: helm repo update
+      changed_when: false
+
+    - name: Desinstalar release ingress-nginx se existir
+      kubernetes.core.helm:
+        name: "{{ helm_release_name }}"
+        namespace: "{{ ingress_namespace }}"
+        state: absent
+      ignore_errors: yes
+
+    - name: Apagar namespace ingress-nginx se existir
+      kubernetes.core.k8s:
+        api_version: v1
+        kind: Namespace
+        name: "{{ ingress_namespace }}"
+        state: absent
+      ignore_errors: yes
+
+    - name: Criar namespace ingress-nginx
+      kubernetes.core.k8s:
+        api_version: v1
+        kind: Namespace
+        name: "{{ ingress_namespace }}"
+        state: present
+
+    - name: Instalar ingress-nginx via helm (comando)
+      command: >
+        helm upgrade --install {{ helm_release_name }} {{ helm_chart_name }}
+        --namespace {{ ingress_namespace }} --create-namespace
