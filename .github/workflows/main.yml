@@ -4,7 +4,7 @@ on:
   push:
     branches: [ "main" ]
     paths:
-      - '05-applications/hello-app/**' # Só roda se mudar o código do app
+      - '05-applications/hello-app/**'
 
 jobs:
   build-and-push:
@@ -43,6 +43,7 @@ jobs:
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git pull --rebase origin main
           git add 05-applications/hello-app/deployment.yaml
-          git commit -m "chore: update image tag to ${{ github.sha }} [skip ci]"
-          git push
+          git commit -m "chore: update image tag to ${{ github.sha }} [skip ci]" || echo "No changes to commit"
+          git push origin main
