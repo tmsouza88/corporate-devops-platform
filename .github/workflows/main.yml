@@ -44,7 +44,8 @@ jobs:
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout .  # Limpa mudanças locais
           git pull --rebase origin main
           git add 05-applications/hello-app/deployment.yaml
-          git commit -m "chore: update image tag to ${{ github.sha }} [skip ci]" || echo "No changes to commit"
+          git diff --cached --quiet || git commit -m "chore: update image tag to ${{ github.sha }} [skip ci]"
           git push origin main
